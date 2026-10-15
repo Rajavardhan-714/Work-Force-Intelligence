@@ -244,7 +244,7 @@ class WorkforceRepository {
     return JSON.parse(JSON.stringify(updated));
   }
 
-  // --- SCENARIO A: AI CANDIDATE MATCHING & TEAM COMPOSITION ENGINE ---
+  // --- AI CANDIDATE MATCHING & TEAM COMPOSITION ENGINE ---
   async computeTeamMatching(projectId: string, customMemberIds?: string[]): Promise<{
     project: Project;
     rankedCandidates: MatchCandidate[];
@@ -252,7 +252,7 @@ class WorkforceRepository {
     teamCoverageInsights: TeamCoverageInsight[];
     overallCoverageScore: number;
   }> {
-    await this.delay(120);
+    await this.delay(60);
 
     const project = await this.getProjectById(projectId);
     if (!project) throw new Error(`Project ${projectId} not found`);
@@ -265,69 +265,83 @@ class WorkforceRepository {
     const rankedCandidates: MatchCandidate[] = allEmployees.map((emp) => {
       let matchedSkillCount = 0;
       let totalSkillPoints = 0;
-      const matchedSkillsList: MatchCandidate['matchedSkills'] = [];
-      const missingSkillsList: MatchCandidate['missingSkills'] = [];
+      const matchingSkills: MatchCandidate['matchingSkills'] = [];
+      const missingSkills: string[] = [];
 
       project.requiredSkills.forEach((req) => {
-        const empSkill = emp.skills.find((s) => s.id === req.skillId || s.name.toLowerCase() === req.skillName.toLowerCase());
+        const empSkill = (emp.skills || []).find((s) => {
+          if (s.skillId && req.skillId && s.skillId === req.skillId) return true;
+          if (s.skillName && req.skillName && s.skillName.toLowerCase() === req.skillName.toLowerCase()) return true;
+          return false;
+        });
 
         if (empSkill) {
           matchedSkillCount++;
           const scoreDelta = Math.min(100, Math.round((empSkill.proficiency / req.minProficiency) * 100));
           totalSkillPoints += scoreDelta * (req.weight / 10);
 
-          matchedSkillsList.push({
-            skillId: req.skillId,
+          matchingSkills.push({
             skillName: req.skillName,
             proficiency: empSkill.proficiency,
-            requiredProficiency: req.minProficiency,
+            required: req.minProficiency,
           });
         } else {
-          missingSkillsList.push({
-            skillId: req.skillId,
-            skillName: req.skillName,
-            requiredProficiency: req.minProficiency,
-          });
+          missingSkills.push(req.skillName);
         }
       });
 
-      const skillMatchScore =
-        project.requiredSkills.length > 0
-          ? Math.round(totalSkillPoints / project.requiredSkills.reduce((acc, r) => acc + r.weight / 10, 0))
-          : 50;
+      const totalWeight = project.requiredSkills.reduce((acc, r) => acc + r.weight / 10, 0);
+      const skillScore = project.requiredSkills.length > 0 && totalWeight > 0
+        ? Math.min(100, Math.round(totalSkillPoints / totalWeight))
+        : 50;
 
-      const availabilityRatio = Math.max(0, 1 - emp.currentHours / emp.targetHours);
-      const availabilityScore = Math.round(availabilityRatio * 100);
+      const capacity = emp.weeklyCapacity || 40;
+      const assigned = emp.totalAssignedHours || 0;
+      const availableHours = Math.max(0, capacity - assigned);
+      const availabilityScore = Math.min(100, Math.round((availableHours / capacity) * 100));
 
-      const expScore = Math.min(100, emp.experienceYears * 12);
+      const experienceScore = Math.min(100, (emp.experienceYears || 2) * 12);
 
-      const compositeScore = Math.round(
-        skillMatchScore * 0.55 + availabilityScore * 0.30 + expScore * 0.15
+      const matchScore = Math.round(
+        skillScore * 0.55 + experienceScore * 0.25 + availabilityScore * 0.20
       );
 
-      const rationaleParts: string[] = [];
-      if (skillMatchScore >= 85) rationaleParts.push(`Strong overlap on ${matchedSkillCount}/${project.requiredSkills.length} required skills`);
-      else if (skillMatchScore >= 60) rationaleParts.push(`Partial fit with ${matchedSkillCount} matching capabilities`);
-      else rationaleParts.push(`Limited skill parity (${matchedSkillCount} matched)`);
+      const explanationParts: string[] = [];
+      if (matchedSkillCount === project.requiredSkills.length && project.requiredSkills.length > 0) {
+        explanationParts.push(`100% skill match across all ${matchedSkillCount} required competencies`);
+      } else if (matchedSkillCount > 0) {
+        explanationParts.push(`Matches ${matchedSkillCount}/${project.requiredSkills.length} required competencies`);
+      } else {
+        explanationParts.push('Adjacent profile without direct competency overlap');
+      }
 
-      if (emp.availability === 'immediate') rationaleParts.push('immediately available');
-      else if (emp.availability === 'part-time') rationaleParts.push('available for part-time allocation');
-      else rationaleParts.push('currently committed to other roadmap streams');
+      if (emp.status === 'underutilized') {
+        explanationParts.push('high availability with latent capacity');
+      } else if (emp.status === 'healthy') {
+        explanationParts.push('balanced workload with available capacity');
+      } else {
+        explanationParts.push('currently at peak workload capacity');
+      }
+
+      const whyExplanation = explanationParts.join(', ') + '.';
+      const isRecommended = matchScore >= 70 && emp.status !== 'overloaded';
 
       return {
         employee: emp,
-        compositeScore,
-        skillMatchScore,
-        availabilityScore,
-        experienceScore: expScore,
-        matchedSkills: matchedSkillsList,
-        missingSkills: missingSkillsList,
-        rationale: rationaleParts.join('; ') + '.',
-        isCurrentlyAssigned: selectedMemberIds.includes(emp.id),
+        matchScore,
+        breakdown: {
+          skillScore,
+          experienceScore,
+          availabilityScore,
+        },
+        matchingSkills,
+        missingSkills,
+        whyExplanation,
+        isRecommended,
       };
     });
 
-    rankedCandidates.sort((a, b) => b.compositeScore - a.compositeScore);
+    rankedCandidates.sort((a, b) => b.matchScore - a.matchScore);
 
     const activeTeamMembers = allEmployees.filter((e) => selectedMemberIds.includes(e.id));
 
@@ -341,9 +355,12 @@ class WorkforceRepository {
       let bestProf = 0;
 
       activeTeamMembers.forEach((member) => {
-        const foundSkill = member.skills.find(
-          (s) => s.id === req.skillId || s.name.toLowerCase() === req.skillName.toLowerCase()
-        );
+        const foundSkill = (member.skills || []).find((s) => {
+          if (s.skillId && req.skillId && s.skillId === req.skillId) return true;
+          if (s.skillName && req.skillName && s.skillName.toLowerCase() === req.skillName.toLowerCase()) return true;
+          return false;
+        });
+
         if (foundSkill) {
           coveredBy.push(member.name);
           if (foundSkill.proficiency > bestProf) {
@@ -356,15 +373,14 @@ class WorkforceRepository {
       totalTeamScore += coverageLevel * req.weight;
 
       const isSatisfied = bestProf >= req.minProficiency;
-      let gapSeverity: TeamCoverageInsight['gapSeverity'] = 'none';
+      let gapSeverity: TeamCoverageInsight['gapSeverity'] = 'None';
       if (!isSatisfied) {
-        gapSeverity = bestProf === 0 ? 'critical' : 'moderate';
+        gapSeverity = bestProf === 0 ? 'Critical' : 'Moderate';
       }
 
       const matchingCourse = allCourses.find((c) => c.targetProjectId === project.id);
 
       return {
-        skillId: req.skillId,
         skillName: req.skillName,
         coverageLevel,
         isSatisfied,
@@ -385,6 +401,10 @@ class WorkforceRepository {
       teamCoverageInsights,
       overallCoverageScore,
     };
+  }
+
+  async computeProjectMatch(projectId: string, customMemberIds?: string[]) {
+    return this.computeTeamMatching(projectId, customMemberIds);
   }
 
   // Reset to initial baseline state (great for demo testing)
