@@ -93,7 +93,7 @@ export const TrainingView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-[var(--status-warning)]">
-                Scenario A Remediation Path
+                Strategic Remediation Path
               </span>
               <Badge variant="warning" size="sm">
                 Critical Priority

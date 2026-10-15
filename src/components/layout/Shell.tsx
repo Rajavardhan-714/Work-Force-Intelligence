@@ -26,8 +26,8 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
   const navItems: { id: NavigationView; label: string; icon: any }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'project-match', label: 'Project Match (Scenario A)', icon: Sparkles },
-    { id: 'workload', label: 'Workload & Rebalance (Scenario B)', icon: Scale },
+    { id: 'project-match', label: 'Project Match', icon: Sparkles },
+    { id: 'workload', label: 'Workload & Rebalance', icon: Scale },
     { id: 'skills', label: 'Skills Heatmap', icon: Grid },
     { id: 'training', label: 'Upskill & Training', icon: GraduationCap },
   ];

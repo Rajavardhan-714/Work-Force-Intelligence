@@ -6,11 +6,9 @@ import {
   Users,
   Briefcase,
   AlertTriangle,
-  Scale,
   ArrowRight,
   TrendingUp,
   Award,
-  Zap,
   ChevronDown,
 } from 'lucide-react';
 import {
@@ -215,23 +213,6 @@ export const OverviewView: React.FC = () => {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Workforce Intelligence
           </h1>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { setSelectedProjectId('prj-analytics'); setCurrentView('project-match'); }}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl transition-all hover:opacity-90"
-            style={{ background: 'rgba(255,85,0,0.14)', color: '#ff5500', border: '1px solid rgba(255,85,0,0.25)' }}
-          >
-            <Zap className="w-3.5 h-3.5" /> Scenario A
-          </button>
-          <button
-            onClick={() => setCurrentView('workload')}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl transition-all hover:opacity-90"
-            style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}
-          >
-            <Scale className="w-3.5 h-3.5" /> Scenario B
-          </button>
         </div>
       </div>
 

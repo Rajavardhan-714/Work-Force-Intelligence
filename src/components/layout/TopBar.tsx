@@ -7,8 +7,6 @@ import {
   Moon,
   RotateCcw,
   Menu,
-  Sparkles,
-  Scale,
   Search,
 } from 'lucide-react';
 
@@ -25,8 +23,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleMobileMenu }) => {
 
   const viewTitles: Record<NavigationView, string> = {
     overview: 'Overview & Metrics',
-    'project-match': 'Project Match (Scenario A)',
-    workload: 'Workload & Rebalance (Scenario B)',
+    'project-match': 'Project Match',
+    workload: 'Workload & Rebalance',
     skills: 'Skills & Competencies',
     training: 'Upskilling & Training Courses',
   };
@@ -54,34 +52,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleMobileMenu }) => {
         </div>
       </div>
 
-      {/* Right Controls: Quick scenario switches, Theme Toggle, Seed Reset */}
+      {/* Right Controls: Theme Toggle, Seed Reset */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick Scenario Toggles for Judges */}
-        <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-surface-secondary)] border border-[var(--border-subtle)]">
-          <button
-            onClick={() => setCurrentView('project-match')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all ${
-              currentView === 'project-match'
-                ? 'text-white shadow-xs'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-            style={currentView === 'project-match' ? { background: '#ff5500' } : {}}
-          >
-            <Sparkles className="w-3 h-3" />
-            Scenario A
-          </button>
-          <button
-            onClick={() => setCurrentView('workload')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 transition-all ${
-              currentView === 'workload'
-                ? 'bg-[var(--status-danger)] text-white shadow-xs'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Scale className="w-3 h-3" />
-            Scenario B
-          </button>
-        </div>
 
         {/* Reset Seed Button */}
         <button

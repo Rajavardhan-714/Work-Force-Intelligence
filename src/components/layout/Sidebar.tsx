@@ -28,8 +28,6 @@ export const Sidebar: React.FC = () => {
       id: 'project-match',
       label: 'Project Match',
       icon: Sparkles,
-      badge: 'A',
-      badgeColor: 'bg-[#ff5500] text-white',
     },
     {
       id: 'workload',

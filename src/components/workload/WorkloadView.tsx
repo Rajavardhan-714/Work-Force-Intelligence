@@ -50,7 +50,7 @@ export const WorkloadView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold text-[var(--status-danger)]">
-              Scenario B • Workload Intelligence
+              Workload Intelligence & Optimization
             </span>
             <span className="w-1 h-1 rounded-full bg-[var(--text-secondary)]" />
             <span className="text-xs text-[var(--text-secondary)]">Burnout prevention & skill-matched redistribution</span>

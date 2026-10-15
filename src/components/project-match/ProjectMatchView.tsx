@@ -82,7 +82,7 @@ export const ProjectMatchView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold text-[var(--accent)]">
-              Scenario A • AI Team Matching
+              AI Team Matching Engine
             </span>
             <span className="w-1 h-1 rounded-full bg-[var(--text-tertiary)]" />
             <span className="text-xs text-[var(--text-secondary)]">Multi-objective constraint engine</span>
