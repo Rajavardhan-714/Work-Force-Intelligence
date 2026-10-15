@@ -17,9 +17,24 @@ import {
   INITIAL_ALERTS,
 } from './mockData';
 
+const API_BASE = '/api';
+
+async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+      ...options,
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Unified In-Memory Workforce Intelligence Repository
- * Provides fast, reactive, deterministic data access and AI recommendation matching.
+ * Unified Workforce Intelligence Client
+ * Uses backend REST API (Express + SQLite) with automatic resilient in-memory fallback.
  */
 class WorkforceRepository {
   private employees: Employee[] = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
@@ -29,17 +44,24 @@ class WorkforceRepository {
   private rebalanceSuggestions: RebalanceSuggestion[] = JSON.parse(JSON.stringify(INITIAL_REBALANCE_SUGGESTIONS));
   private alerts: SystemAlert[] = JSON.parse(JSON.stringify(INITIAL_ALERTS));
 
-  private async delay(ms = 40): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  // --- HEALTH CHECK ---
+  async checkHealth(): Promise<{ status: string; uptime?: number } | null> {
+    return apiFetch<{ status: string; uptime?: number }>('/health');
   }
 
   // --- EMPLOYEES ---
   async getEmployees(): Promise<Employee[]> {
-    await this.delay();
+    const remote = await apiFetch<Employee[]>('/employees');
+    if (remote) {
+      this.employees = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.employees));
   }
 
   async getEmployeeById(id: string): Promise<Employee | null> {
+    const remote = await apiFetch<Employee>(`/employees/${id}`);
+    if (remote) return remote;
     const list = await this.getEmployees();
     const found = list.find((e) => e.id === id);
     return found ? JSON.parse(JSON.stringify(found)) : null;
@@ -47,18 +69,31 @@ class WorkforceRepository {
 
   // --- PROJECTS ---
   async getProjects(): Promise<Project[]> {
-    await this.delay();
+    const remote = await apiFetch<Project[]>('/projects');
+    if (remote) {
+      this.projects = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.projects));
   }
 
   async getProjectById(id: string): Promise<Project | null> {
+    const remote = await apiFetch<Project>(`/projects/${id}`);
+    if (remote) return remote;
     const list = await this.getProjects();
     const found = list.find((p) => p.id === id);
     return found ? JSON.parse(JSON.stringify(found)) : null;
   }
 
   async createProject(newProject: Omit<Project, 'id' | 'currentMemberIds'>): Promise<Project> {
-    await this.delay();
+    const remote = await apiFetch<Project>('/projects', {
+      method: 'POST',
+      body: JSON.stringify(newProject),
+    });
+    if (remote) {
+      this.projects.push(remote);
+      return remote;
+    }
     const project: Project = {
       ...newProject,
       id: `proj-${Date.now().toString(36)}`,
@@ -69,7 +104,15 @@ class WorkforceRepository {
   }
 
   async updateProjectMembers(projectId: string, currentMemberIds: string[]): Promise<Project> {
-    await this.delay();
+    const remote = await apiFetch<Project>(`/projects/${projectId}/members`, {
+      method: 'PUT',
+      body: JSON.stringify({ currentMemberIds }),
+    });
+    if (remote) {
+      const idx = this.projects.findIndex((p) => p.id === projectId);
+      if (idx !== -1) this.projects[idx] = remote;
+      return remote;
+    }
     const idx = this.projects.findIndex((p) => p.id === projectId);
     if (idx !== -1) {
       this.projects[idx].currentMemberIds = currentMemberIds;
@@ -81,25 +124,41 @@ class WorkforceRepository {
 
   // --- SKILLS ---
   async getSkills(): Promise<Skill[]> {
-    await this.delay();
+    const remote = await apiFetch<Skill[]>('/skills');
+    if (remote) {
+      this.skills = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.skills));
   }
 
   // --- COURSES ---
   async getCourses(): Promise<TrainingCourse[]> {
-    await this.delay();
+    const remote = await apiFetch<TrainingCourse[]>('/courses');
+    if (remote) {
+      this.courses = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.courses));
   }
 
   // --- ALERTS ---
   async getAlerts(): Promise<SystemAlert[]> {
-    await this.delay();
+    const remote = await apiFetch<SystemAlert[]>('/alerts');
+    if (remote) {
+      this.alerts = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.alerts));
   }
 
   // --- REBALANCE SUGGESTIONS ---
   async getRebalanceSuggestions(): Promise<RebalanceSuggestion[]> {
-    await this.delay();
+    const remote = await apiFetch<RebalanceSuggestion[]>('/rebalance-suggestions');
+    if (remote) {
+      this.rebalanceSuggestions = remote;
+      return JSON.parse(JSON.stringify(remote));
+    }
     return JSON.parse(JSON.stringify(this.rebalanceSuggestions));
   }
 
@@ -107,25 +166,39 @@ class WorkforceRepository {
     suggestionId: string,
     status: 'accepted' | 'rejected' | 'pending'
   ): Promise<{ suggestion: RebalanceSuggestion; employees: Employee[] }> {
-    await this.delay();
+    const remote = await apiFetch<{ suggestion: RebalanceSuggestion; employees: Employee[] }>(
+      `/rebalance-suggestions/${suggestionId}/status`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      }
+    );
+    if (remote) {
+      const idx = this.rebalanceSuggestions.findIndex((s) => s.id === suggestionId);
+      if (idx !== -1) this.rebalanceSuggestions[idx] = remote.suggestion;
+      this.employees = remote.employees;
+      return remote;
+    }
+
     const idx = this.rebalanceSuggestions.findIndex((s) => s.id === suggestionId);
     if (idx === -1) throw new Error('Suggestion not found');
 
     this.rebalanceSuggestions[idx].status = status;
     const sug = this.rebalanceSuggestions[idx];
+    const transferHours = sug.hours || (sug as any).hoursToTransfer || 0;
 
     if (status === 'accepted') {
       const fromEmp = this.employees.find((e) => e.id === sug.fromEmployeeId);
       const toEmp = this.employees.find((e) => e.id === sug.toEmployeeId);
 
       if (fromEmp) {
-        fromEmp.totalAssignedHours = Math.max(0, fromEmp.totalAssignedHours - sug.hoursToTransfer);
+        fromEmp.totalAssignedHours = Math.max(0, fromEmp.totalAssignedHours - transferHours);
         fromEmp.utilizationRate = parseFloat((fromEmp.totalAssignedHours / fromEmp.weeklyCapacity).toFixed(2));
         fromEmp.status = fromEmp.utilizationRate > 1.0 ? 'overloaded' : fromEmp.utilizationRate < 0.6 ? 'underutilized' : 'healthy';
       }
 
       if (toEmp) {
-        toEmp.totalAssignedHours += sug.hoursToTransfer;
+        toEmp.totalAssignedHours += transferHours;
         toEmp.utilizationRate = parseFloat((toEmp.totalAssignedHours / toEmp.weeklyCapacity).toFixed(2));
         toEmp.status = toEmp.utilizationRate > 1.0 ? 'overloaded' : toEmp.utilizationRate < 0.6 ? 'underutilized' : 'healthy';
       }
@@ -153,7 +226,20 @@ class WorkforceRepository {
     teamCoverageInsights: TeamCoverageInsight[];
     overallCoverageScore: number;
   }> {
-    await this.delay(40);
+    const remote = await apiFetch<{
+      project: Project;
+      rankedCandidates: MatchCandidate[];
+      selectedMemberIds: string[];
+      teamCoverageInsights: TeamCoverageInsight[];
+      overallCoverageScore: number;
+    }>(`/projects/${projectId}/match`, {
+      method: 'POST',
+      body: JSON.stringify({ customMemberIds }),
+    });
+
+    if (remote) {
+      return remote;
+    }
 
     const project = await this.getProjectById(projectId);
     if (!project) throw new Error(`Project ${projectId} not found`);
@@ -192,9 +278,10 @@ class WorkforceRepository {
       });
 
       const totalWeight = project.requiredSkills.reduce((acc, r) => acc + r.weight / 10, 0);
-      const skillScore = project.requiredSkills.length > 0 && totalWeight > 0
-        ? Math.min(100, Math.round(totalSkillPoints / totalWeight))
-        : 50;
+      const skillScore =
+        project.requiredSkills.length > 0 && totalWeight > 0
+          ? Math.min(100, Math.round(totalSkillPoints / totalWeight))
+          : 50;
 
       const capacity = emp.weeklyCapacity || 40;
       const assigned = emp.totalAssignedHours || 0;
@@ -310,7 +397,13 @@ class WorkforceRepository {
 
   // Reset to initial baseline state (great for demo testing)
   async resetToSeed(): Promise<void> {
-    await this.delay(30);
+    const remote = await apiFetch<{ success: boolean }>('/reset', { method: 'POST' });
+    if (remote?.success) {
+      await this.getEmployees();
+      await this.getProjects();
+      await this.getRebalanceSuggestions();
+      return;
+    }
     this.employees = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
     this.projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
     this.rebalanceSuggestions = JSON.parse(JSON.stringify(INITIAL_REBALANCE_SUGGESTIONS));

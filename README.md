@@ -1,13 +1,14 @@
 # Workforce Intelligence — Autonomous Talent & Capacity Orchestration
 > Built for HackAttack 2026 (Web & App Development Track)  
-> Stack: **React 19 + TypeScript + Vite + Tailwind CSS + Framer Motion + Recharts + Zustand + Lucide**
+> Stack: **Express + SQLite (better-sqlite3) + React 19 + TypeScript + Vite + Tailwind CSS + Framer Motion + Recharts**
 
 ---
 
 ## 🌟 Executive Overview
-**Workforce Intelligence** is an Apple-inspired workforce planning and optimization dashboard. It matches employees to high-stakes projects using multi-objective constraints (skills, domain seniority, real-time availability), identifies organizational capability deficits, recommends targeted upskilling curricula, and balances engineering workloads to prevent burnout.
+**Workforce Intelligence** is an enterprise workforce planning and talent orchestration platform powered by an **Express + SQLite REST API backend** and an Apple-inspired reactive frontend. It matches employees to high-stakes projects using multi-objective constraints (skills, domain seniority, real-time availability), identifies organizational capability deficits, recommends targeted upskilling curricula, and balances engineering workloads to prevent burnout.
 
 ### Key Capabilities & Judging Criteria
+- **Backend Architecture & Persistence**: Express REST API backed by embedded SQLite (`better-sqlite3`) with WAL-mode journaling, ACID transactions, atomic rebalancing, and automatic database seeding.
 - **Matching Accuracy & Multi-Objective Scoring**: Weighted evaluation combining competency proficiencies (55%), domain experience (25%), and unallocated bandwidth (20%).
 - **Team Capability Coverage Bar**: Visualizes aggregate team readiness against project requirements and flags skill deficits in under 5 seconds.
 - **Skill Gap Diagnostics & Training Integration**: Automatically connects unfulfilled requirements to curated enterprise curricula.
@@ -30,12 +31,36 @@ cd Hackathon
 # Install runtime and dev dependencies
 npm install
 
-# Start Vite Development Server
+# Start Fullstack Development Environment (API Server + Vite Frontend concurrently)
 npm run dev
 ```
 
-The application will be live at:
-👉 **`http://localhost:5173/`**
+- **Frontend Application**: 👉 **`http://localhost:5173/`**
+- **Backend REST API**: 👉 **`http://localhost:3001/api/health`**
+
+You can also start each service independently:
+- `npm run server` — Runs the Express + SQLite backend on port 3001
+- `npm run dev:client` — Runs the Vite frontend dev server on port 5173
+
+### 3. Backend REST API Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Backend status, uptime, and timestamp |
+| `GET` | `/api/employees` | List all employees with skill levels & active workloads |
+| `GET` | `/api/employees/:id` | Fetch employee by ID |
+| `POST` | `/api/employees` | Create a new employee record |
+| `PUT` | `/api/employees/:id` | Update employee record |
+| `GET` | `/api/projects` | List all tracked enterprise projects |
+| `GET` | `/api/projects/:id` | Fetch specific project requirements & members |
+| `POST` | `/api/projects` | Create a new project |
+| `PUT` | `/api/projects/:id/members` | Assign/update project team member roster |
+| `GET` | `/api/skills` | Skill taxonomy catalog |
+| `GET` | `/api/courses` | Upskilling course curricula |
+| `GET` | `/api/alerts` | Active workforce risks & bottleneck alerts |
+| `GET` | `/api/rebalance-suggestions` | AI-generated workload rebalancing proposals |
+| `POST` | `/api/rebalance-suggestions/:id/status` | Atomic transaction to accept/reject rebalance & transfer hours |
+| `POST` | `/api/projects/:id/match` | Compute weighted candidate fit & team competency coverage |
+| `POST` | `/api/reset` | Reset SQLite database to initial baseline seed state |
 
 ---
 

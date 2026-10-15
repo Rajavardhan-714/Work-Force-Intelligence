@@ -114,7 +114,7 @@ export interface TrainingCourse {
   skillName: string;
   provider: string;
   duration: string;
-  level: 'Intermediate' | 'Advanced' | 'Mastery';
+  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Mastery';
   rating: number;
   associatedGapReason: string;
   priority: 'Critical' | 'High' | 'Medium';

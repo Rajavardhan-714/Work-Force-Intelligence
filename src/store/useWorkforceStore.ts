@@ -70,7 +70,7 @@ export const useWorkforceStore = create<WorkforceStore>()(
     courses: [],
     alerts: [],
     rebalanceSuggestions: [],
-    selectedProjectId: 'prj-analytics', // Scenario A hero project
+    selectedProjectId: 'P7', // Scenario A hero project (Customer Churn Analytics Platform)
     projectMatchResult: null,
     selectedEmployeeDetail: null,
     isLoading: true,
@@ -93,7 +93,10 @@ export const useWorkforceStore = create<WorkforceStore>()(
           api.getRebalanceSuggestions(),
         ]);
 
-        const selectedProjectId = get().selectedProjectId || projects[0]?.id || 'prj-analytics';
+        const currentSelected = get().selectedProjectId;
+        const selectedProjectId = projects.some((p) => p.id === currentSelected)
+          ? currentSelected
+          : projects[0]?.id || 'P7';
         set({
           employees,
           projects,
