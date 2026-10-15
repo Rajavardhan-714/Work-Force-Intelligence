@@ -16,13 +16,10 @@ import {
   INITIAL_REBALANCE_SUGGESTIONS,
   INITIAL_ALERTS,
 } from './mockData';
-import { isFirebaseConfigured } from '../lib/firebase';
-import { firebaseService } from './firebaseService';
 
 /**
- * Unified Workforce Repository
- * Seamlessly interfaces with Firestore when credentials are provided in .env.local,
- * or gracefully falls back to the local in-memory dataset when keys are pending.
+ * Unified In-Memory Workforce Intelligence Repository
+ * Provides fast, reactive, deterministic data access and AI recommendation matching.
  */
 class WorkforceRepository {
   private employees: Employee[] = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
@@ -32,39 +29,12 @@ class WorkforceRepository {
   private rebalanceSuggestions: RebalanceSuggestion[] = JSON.parse(JSON.stringify(INITIAL_REBALANCE_SUGGESTIONS));
   private alerts: SystemAlert[] = JSON.parse(JSON.stringify(INITIAL_ALERTS));
 
-  private async delay(ms = 80): Promise<void> {
+  private async delay(ms = 40): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  get isFirebaseActive(): boolean {
-    return isFirebaseConfigured();
-  }
-
-  // --- SEED FIRESTORE ---
-  async seedFirebase(): Promise<{ success: boolean; count: number }> {
-    if (!this.isFirebaseActive) {
-      throw new Error('Firebase is not configured. Add credentials in .env.local first.');
-    }
-    const result = await firebaseService.seedFirestore();
-    // Reload local cache from Firestore
-    await this.getEmployees();
-    await this.getProjects();
-    return result;
   }
 
   // --- EMPLOYEES ---
   async getEmployees(): Promise<Employee[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreEmps = await firebaseService.getEmployees();
-        if (firestoreEmps.length > 0) {
-          this.employees = firestoreEmps;
-          return firestoreEmps;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading employees, using fallback:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.employees));
   }
@@ -77,17 +47,6 @@ class WorkforceRepository {
 
   // --- PROJECTS ---
   async getProjects(): Promise<Project[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreProjs = await firebaseService.getProjects();
-        if (firestoreProjs.length > 0) {
-          this.projects = firestoreProjs;
-          return firestoreProjs;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading projects, using fallback:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.projects));
   }
@@ -99,38 +58,22 @@ class WorkforceRepository {
   }
 
   async createProject(newProject: Omit<Project, 'id' | 'currentMemberIds'>): Promise<Project> {
+    await this.delay();
     const project: Project = {
       ...newProject,
       id: `proj-${Date.now().toString(36)}`,
       currentMemberIds: [],
     };
-
-    if (this.isFirebaseActive) {
-      try {
-        await firebaseService.createProject(project);
-      } catch (err) {
-        console.warn('[Firebase] Error writing project to Firestore:', err);
-      }
-    }
-
     this.projects.push(project);
-    return project;
+    return JSON.parse(JSON.stringify(project));
   }
 
   async updateProjectMembers(projectId: string, currentMemberIds: string[]): Promise<Project> {
+    await this.delay();
     const idx = this.projects.findIndex((p) => p.id === projectId);
     if (idx !== -1) {
       this.projects[idx].currentMemberIds = currentMemberIds;
     }
-
-    if (this.isFirebaseActive) {
-      try {
-        await firebaseService.updateProjectMembers(projectId, currentMemberIds);
-      } catch (err) {
-        console.warn('[Firebase] Error updating project members:', err);
-      }
-    }
-
     const updated = this.projects.find((p) => p.id === projectId);
     if (!updated) throw new Error('Project not found');
     return JSON.parse(JSON.stringify(updated));
@@ -138,110 +81,68 @@ class WorkforceRepository {
 
   // --- SKILLS ---
   async getSkills(): Promise<Skill[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreSkills = await firebaseService.getSkills();
-        if (firestoreSkills.length > 0) {
-          this.skills = firestoreSkills;
-          return firestoreSkills;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading skills:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.skills));
   }
 
   // --- COURSES ---
   async getCourses(): Promise<TrainingCourse[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreCourses = await firebaseService.getCourses();
-        if (firestoreCourses.length > 0) {
-          this.courses = firestoreCourses;
-          return firestoreCourses;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading courses:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.courses));
   }
 
   // --- ALERTS ---
   async getAlerts(): Promise<SystemAlert[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreAlerts = await firebaseService.getAlerts();
-        if (firestoreAlerts.length > 0) {
-          this.alerts = firestoreAlerts;
-          return firestoreAlerts;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading alerts:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.alerts));
   }
 
   // --- REBALANCE SUGGESTIONS ---
   async getRebalanceSuggestions(): Promise<RebalanceSuggestion[]> {
-    if (this.isFirebaseActive) {
-      try {
-        const firestoreSugs = await firebaseService.getRebalanceSuggestions();
-        if (firestoreSugs.length > 0) {
-          this.rebalanceSuggestions = firestoreSugs;
-          return firestoreSugs;
-        }
-      } catch (err) {
-        console.warn('[Firebase] Error loading rebalance suggestions:', err);
-      }
-    }
     await this.delay();
     return JSON.parse(JSON.stringify(this.rebalanceSuggestions));
+  }
+
+  async setRebalanceStatus(
+    suggestionId: string,
+    status: 'accepted' | 'rejected' | 'pending'
+  ): Promise<{ suggestion: RebalanceSuggestion; employees: Employee[] }> {
+    await this.delay();
+    const idx = this.rebalanceSuggestions.findIndex((s) => s.id === suggestionId);
+    if (idx === -1) throw new Error('Suggestion not found');
+
+    this.rebalanceSuggestions[idx].status = status;
+    const sug = this.rebalanceSuggestions[idx];
+
+    if (status === 'accepted') {
+      const fromEmp = this.employees.find((e) => e.id === sug.fromEmployeeId);
+      const toEmp = this.employees.find((e) => e.id === sug.toEmployeeId);
+
+      if (fromEmp) {
+        fromEmp.totalAssignedHours = Math.max(0, fromEmp.totalAssignedHours - sug.hoursToTransfer);
+        fromEmp.utilizationRate = parseFloat((fromEmp.totalAssignedHours / fromEmp.weeklyCapacity).toFixed(2));
+        fromEmp.status = fromEmp.utilizationRate > 1.0 ? 'overloaded' : fromEmp.utilizationRate < 0.6 ? 'underutilized' : 'healthy';
+      }
+
+      if (toEmp) {
+        toEmp.totalAssignedHours += sug.hoursToTransfer;
+        toEmp.utilizationRate = parseFloat((toEmp.totalAssignedHours / toEmp.weeklyCapacity).toFixed(2));
+        toEmp.status = toEmp.utilizationRate > 1.0 ? 'overloaded' : toEmp.utilizationRate < 0.6 ? 'underutilized' : 'healthy';
+      }
+    }
+
+    return {
+      suggestion: JSON.parse(JSON.stringify(this.rebalanceSuggestions[idx])),
+      employees: JSON.parse(JSON.stringify(this.employees)),
+    };
   }
 
   async updateRebalanceStatus(
     suggestionId: string,
     status: 'accepted' | 'rejected' | 'pending'
   ): Promise<RebalanceSuggestion> {
-    const idx = this.rebalanceSuggestions.findIndex((s) => s.id === suggestionId);
-    if (idx !== -1) {
-      this.rebalanceSuggestions[idx].status = status;
-      // Invert or modify employee workload hours in local cache
-      const sug = this.rebalanceSuggestions[idx];
-      if (status === 'accepted') {
-        const fromEmp = this.employees.find((e) => e.id === sug.fromEmployeeId);
-        const toEmp = this.employees.find((e) => e.id === sug.toEmployeeId);
-        if (fromEmp) {
-          fromEmp.currentHours = Math.max(0, fromEmp.currentHours - sug.hoursToTransfer);
-          if (fromEmp.currentHours <= fromEmp.targetHours) {
-            fromEmp.status = 'healthy';
-          }
-        }
-        if (toEmp) {
-          toEmp.currentHours += sug.hoursToTransfer;
-          if (toEmp.currentHours >= toEmp.targetHours * 0.5) {
-            toEmp.status = 'healthy';
-          }
-        }
-      }
-    }
-
-    if (this.isFirebaseActive) {
-      try {
-        await firebaseService.updateRebalanceStatus(suggestionId, status);
-      } catch (err) {
-        console.warn('[Firebase] Error updating rebalance status in Firestore:', err);
-      }
-    }
-
-    const updated = this.rebalanceSuggestions.find((s) => s.id === suggestionId);
-    if (!updated) throw new Error('Suggestion not found');
-    return JSON.parse(JSON.stringify(updated));
+    const res = await this.setRebalanceStatus(suggestionId, status);
+    return res.suggestion;
   }
 
   // --- AI CANDIDATE MATCHING & TEAM COMPOSITION ENGINE ---
@@ -252,7 +153,7 @@ class WorkforceRepository {
     teamCoverageInsights: TeamCoverageInsight[];
     overallCoverageScore: number;
   }> {
-    await this.delay(60);
+    await this.delay(40);
 
     const project = await this.getProjectById(projectId);
     if (!project) throw new Error(`Project ${projectId} not found`);
@@ -409,7 +310,7 @@ class WorkforceRepository {
 
   // Reset to initial baseline state (great for demo testing)
   async resetToSeed(): Promise<void> {
-    await this.delay(50);
+    await this.delay(30);
     this.employees = JSON.parse(JSON.stringify(INITIAL_EMPLOYEES));
     this.projects = JSON.parse(JSON.stringify(INITIAL_PROJECTS));
     this.rebalanceSuggestions = JSON.parse(JSON.stringify(INITIAL_REBALANCE_SUGGESTIONS));

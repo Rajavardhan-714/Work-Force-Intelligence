@@ -10,9 +10,7 @@ import {
   Layers,
   RotateCcw,
   ShieldCheck,
-  Flame,
 } from 'lucide-react';
-import { api } from '../../api';
 
 export const Sidebar: React.FC = () => {
   const currentView = useWorkforceStore((s) => s.currentView);
@@ -144,36 +142,8 @@ export const Sidebar: React.FC = () => {
               <span>Evaluation Ready</span>
             </div>
             <p className="leading-tight text-[var(--text-secondary)] font-medium" style={{ fontSize: 11 }}>
-              Scenarios A & B loaded.
+              Workforce Intelligence active.
             </p>
-          </div>
-
-          {/* Firebase Connection Indicator */}
-          <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5">
-              <Flame className={`w-3.5 h-3.5 ${api.isFirebaseActive ? 'text-amber-400' : 'text-zinc-500'}`} />
-              <span className={api.isFirebaseActive ? 'text-amber-300 font-semibold' : 'text-[var(--text-secondary)] font-medium'}>
-                {api.isFirebaseActive ? 'Firebase Live' : 'Firebase Ready'}
-              </span>
-            </div>
-            {api.isFirebaseActive ? (
-              <button
-                onClick={async () => {
-                  try {
-                    await api.seedFirebase();
-                    alert('Firestore seeded successfully with workforce intelligence data!');
-                  } catch (e: any) {
-                    alert('Error seeding Firestore: ' + e.message);
-                  }
-                }}
-                className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 font-medium cursor-pointer"
-                title="Populate Firestore with initial demo collections"
-              >
-                Seed Cloud
-              </button>
-            ) : (
-              <span className="text-[10px] text-zinc-500 font-mono">.env.local</span>
-            )}
           </div>
         </div>
 
